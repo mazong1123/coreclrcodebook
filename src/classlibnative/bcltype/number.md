@@ -6,7 +6,9 @@
 
 ## Overview
 
-Defines number formatting and converting functions. Such as `FormatDecimal`, `FormatDouble` and `NumberBufferToDouble` are all defined here.
+`numer.h` and `number.cpp` define number formatting and converting functions. Such as `FormatDecimal`, `FormatDouble` and `NumberBufferToDouble` are all defined here.
+
+## Class/Methods/Functions
 
 There're 2 class/struct defined here:
 
@@ -43,3 +45,20 @@ public:
 `COMNumber` defines common formatting and converting functions. You'll find there're macros like `FCDECL3_VII`, `FCDECL2` and `FCDECL3`. They declare these functions are `FCall`s. `Fcall` allows you to call DIRECTLY into the CLR code from managed code.
 
 More details about `FCall` can be found at [fcall.md](../../vm/fcall.md)
+
+Note: `FCall` functions obey certain rules. We do not bother the rules here. Instead we focus on the functionality of each function.
+
+#### FCIMPL3_VII(Object*, COMNumber::FormatDouble, double value, StringObject* formatUNSAFE, NumberFormatInfo* numfmtUNSAFE)
+
+
+This function trying to convert a given double number to a string with a given format. 
+
+In managed code, it's called on [double.ToString()](https://github.com/dotnet/coreclr/blob/e6865018d91fd257f05a42fe4fe353beb32c641a/src/mscorlib/shared/System/Double.cs#L249)
+
+Since it's a `FCall`, here's a corresponding [managed code interface](https://github.com/dotnet/coreclr/blob/cdff8b0babe5d82737058ccdae8b14d8ae90160d/src/mscorlib/src/System/Number.cs#L297-L298).
+
+The most important part of this function is to choose the right precision and call `DoubleToNumber` to convert the input double value. It's all replying on the value of `formatUNSAFE`:
+
+`R`:
+In order to give numbers that are both friendly to display and round-trippable,
+We parse the number using 15 digits and then determine if it round trips to the same value.  If it does, we convert that NUMBER to a string, otherwise we reparse using 17 digits and display that.
