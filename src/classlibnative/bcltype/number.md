@@ -4,6 +4,8 @@
 
 [number.cpp](https://github.com/dotnet/coreclr/blob/master/src/classlibnative/bcltype/number.cpp)
 
+## Overview
+
 Defines number formatting and converting functions. Such as `FormatDecimal`, `FormatDouble` and `NumberBufferToDouble` are all defined here.
 
 There're 2 class/struct defined here:
@@ -38,6 +40,6 @@ public:
 };
 ```
 
-`COMNumber` defines common formatting and converting functions. You'll find there're macros like `FCDECL3_VII`, `FCDECL2` and `FCDECL3`. They declare these functions are `fcalls`.
+`COMNumber` defines common formatting and converting functions. You'll find there're macros like `FCDECL3_VII`, `FCDECL2` and `FCDECL3`. They declare these functions are `FCall`s. `Fcall` allows you to call DIRECTLY into the CLR code from managed code.
 
-More details about `fcall` can be found at [fcall.md](../../vm/fcall.md)
+More details about `FCall` can be found at [fcall.md](../../vm/fcall.md)
