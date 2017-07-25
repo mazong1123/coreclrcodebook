@@ -18,7 +18,7 @@ struct NUMBER {
     NUMBER() : precision(0), scale(0), sign(0), allDigits(NULL) {}
 };
 ```
-This is an abstract data structure to represent number. Especially useful for representing `double`. To understand this data structure, you need to read [IEEE Double-precision floating-point format](https://en.wikipedia.org/wiki/Double-precision_floating-point_format)
+This is an abstract data structure to represent a number. Especially useful for representing `double`. To understand this data structure, you need to read [IEEE Double-precision floating-point format](https://en.wikipedia.org/wiki/Double-precision_floating-point_format)
 
 ```cpp
 class COMNumber
@@ -40,4 +40,4 @@ public:
 
 `COMNumber` defines common formatting and converting functions. You'll find there're macros like `FCDECL3_VII`, `FCDECL2` and `FCDECL3`. They declare these functions are `fcalls`.
 
-More details about `fcall` can be found at [fcall.md](../../../vm/fcall.md)
+More details about `fcall` can be found at [fcall.md](../../vm/fcall.md)
