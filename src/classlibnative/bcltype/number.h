@@ -30,9 +30,9 @@ struct NUMBER {
 
 // Defines common formatting and converting functions. You'll find there're macros like FCDECL3_VII, FCDECL2 and FCDECL3.
 // They declare these functions are "FCall"s. "Fcall" allows you to call DIRECTLY into the CLR code from managed code.
-
+//
 // More details about `FCall` can be found at https://github.com/mazong1123/coreclrcodebook/tree/master/src/vm/README.md#fcall
-
+//
 // Note: "FCall" functions obey certain rules. We do not bother the rules here. Instead we focus on the functionality of each function.
 class COMNumber
 {

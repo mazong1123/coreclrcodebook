@@ -2088,12 +2088,14 @@ FCIMPLEND
 // The most important part of this function is to choose the right precision and call "DoubleToNumber"" to convert the input double value. It's all replying on the value of "formatUNSAFE"
 FCIMPL3_VII(Object*, COMNumber::FormatDouble, double value, StringObject* formatUNSAFE, NumberFormatInfo* numfmtUNSAFE)
 {
+    // This is a FCall constrain.
     FCALL_CONTRACT;
 
     NUMBER number;
     int digits;
     double dTest;
 
+    // FCall must handle gc by itself. This is a gc frame.
     struct _gc
     {
         STRINGREF   format;
@@ -2105,6 +2107,7 @@ FCIMPL3_VII(Object*, COMNumber::FormatDouble, double value, StringObject* format
     gc.numfmt = (NUMFMTREF) numfmtUNSAFE;
     gc.refRetVal = NULL;
 
+    // Begin the gc frame.
     HELPER_METHOD_FRAME_BEGIN_RET_PROTECT(gc);
 
     if (gc.numfmt == 0) COMPlusThrowArgumentNull(W("NumberFormatInfo"));
@@ -2140,17 +2143,17 @@ FCIMPL3_VII(Object*, COMNumber::FormatDouble, double value, StringObject* format
             goto lExit;
         }
 
-        // Try to convert the 15 digits precision string back to double value.
+        // 2. Try to convert the 15 digits precision string back to double value.
         NumberToDouble(&number, &dTest);
 
-        // If the converted double value equals to the original input double value,
+        // 3. If the converted double value equals to the original input double value,
         // we end up at 15 digits precision.
         if (dTest == value) {
             gc.refRetVal = NumberToString(&number, 'G', DOUBLE_PRECISION, gc.numfmt);
             goto lExit;
         }
 
-        // Otherwise we try to convert the double value in 17 digits precision.
+        // 4. Otherwise we try to convert the double value in 17 digits precision.
         DoubleToNumber(value, 17, &number);
         gc.refRetVal = NumberToString(&number, 'G', 17, gc.numfmt);
         goto lExit;
@@ -2195,6 +2198,7 @@ FCIMPL3_VII(Object*, COMNumber::FormatDouble, double value, StringObject* format
     }
 
 lExit: ;
+    // End the gc frame.
     HELPER_METHOD_FRAME_END();
 
     return OBJECTREFToObject(gc.refRetVal);
