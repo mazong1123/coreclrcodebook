@@ -2180,11 +2180,15 @@ FCIMPL3_VII(Object*, COMNumber::FormatDouble, double value, StringObject* format
     // Convert the double value either in 15 or 17 digits precision.
     DoubleToNumber(value, precision, &number);
 
+    // If number is NaN. You need to read https://en.wikipedia.org/wiki/Double-precision_floating-point_format
+    // to understand this.
     if (number.scale == (int) SCALE_NAN) {
         gc.refRetVal = gc.numfmt->sNaN;
         goto lExit;
     }
 
+    // If number is positive infinity or negative infinity. You need to read https://en.wikipedia.org/wiki/Double-precision_floating-point_format
+    // to understand this.
     if (number.scale == SCALE_INF) {
         gc.refRetVal = (number.sign? gc.numfmt->sNegativeInfinity: gc.numfmt->sPositiveInfinity);
         goto lExit;
