@@ -5,4 +5,4 @@ The folder structure is similar as CoreCLR repository so it's easy to follow.
 
 For each module, there's a `README.md` provides an overview of this module, which is a good entry to get started.
 
-The detailed analysis is inline in the files. Files not in this repository are still in progress.
+The detailed analysis is inline in the files.
