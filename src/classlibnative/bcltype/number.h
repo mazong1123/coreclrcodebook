@@ -40,8 +40,8 @@ public:
     static FCDECL3_VII(Object*, FormatDecimal, FC_DECIMAL value, StringObject* formatUNSAFE, NumberFormatInfo* numfmtUNSAFE);
     
     // This function trying to convert a given double number to a string with a given format.
-    // In managed code, it's called on [double.ToString()](https://github.com/dotnet/coreclr/blob/e6865018d91fd257f05a42fe4fe353beb32c641a/src/mscorlib/shared/System/Double.cs#L249)
-    // Since it's a `FCall`, here's a corresponding [managed code interface](https://github.com/dotnet/coreclr/blob/cdff8b0babe5d82737058ccdae8b14d8ae90160d/src/mscorlib/src/System/Number.cs#L297-L298).
+    // In managed code, it's called on [double.ToString()](https://github.com/mazong1123/coreclrcodebook/blob/master/src/mscorlib/shared/System/Double.cs#L250)
+    // Since it's a `FCall`, here's a corresponding [managed code interface](https://github.com/mazong1123/coreclrcodebook/blob/master/src/mscorlib/src/System/Number.cs#L297-L298).
     // The most important part of this function is to choose the right precision and call "DoubleToNumber"" to convert the input double value. It's all replying on the value of "formatUNSAFE"
     static FCDECL3_VII(Object*, FormatDouble,  double  value, StringObject* formatUNSAFE, NumberFormatInfo* numfmtUNSAFE);
     static FCDECL3_VII(Object*, FormatSingle,  float   value, StringObject* formatUNSAFE, NumberFormatInfo* numfmtUNSAFE);
@@ -52,9 +52,9 @@ public:
     static FCDECL2(FC_BOOL_RET, NumberBufferToDecimal, BYTE* number, DECIMAL* value);
     
     // This function trying to convert a number (BYTE*) back to double.
-    // In managed code, it's called on [Number.ParseDouble()](https://github.com/dotnet/coreclr/blob/cdff8b0babe5d82737058ccdae8b14d8ae90160d/src/mscorlib/src/System/Number.cs#L716)
+    // In managed code, it's called on [Number.ParseDouble()](https://github.com/mazong1123/coreclrcodebook/blob/master/src/mscorlib/src/System/Number.cs#L716)
     // Note that in managed code, the input string was converted to `NumberBuffer` and then converted to byte* via `NumberBuffer.PackForNative()`.
-    // Since it's a `FCall`, here's a corresponding [managed code interface](https://github.com/dotnet/coreclr/blob/cdff8b0babe5d82737058ccdae8b14d8ae90160d/src/mscorlib/src/System/Number.cs#L312-L313).
+    // Since it's a `FCall`, here's a corresponding [managed code interface](https://github.com/mazong1123/coreclrcodebook/blob/master/src/mscorlib/src/System/Number.cs#L312-L313).
     static FCDECL2(FC_BOOL_RET, NumberBufferToDouble, BYTE* number, double* value);
 
     static wchar_t* Int32ToDecChars(__in wchar_t* p, unsigned int value, int digits);
