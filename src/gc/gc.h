@@ -77,7 +77,9 @@ class Object;
 class IGCHeapInternal;
 
 /* misc defines */
+// >= 85000 bytes is a large object. < 85000 bytes is a small object.
 #define LARGE_OBJECT_SIZE ((size_t)(85000))
+// For small object, we only have 0, 1, 2 generations
 #define max_generation 2
 
 #ifdef GC_CONFIG_DRIVEN
@@ -221,16 +223,31 @@ public:
     bool IsValidSegmentSize(size_t cbSize)
     {
         //Must be aligned on a Mb and greater than 4Mb
+        //
+        // 1Mb = 1024 * 1024 = (0001 0000 0000 0000 0000 0000)2
+        // 1024 * 1024 - 1 = (0000 1111 1111 1111 1111 1111)2
+        // So only when cbSize is 1024 * 1024 * n (n >= 0), the result can be 0. That's "aligned on a Mb".
+        //
+        // cbSize >> 22 = cbSize / 2^22
+        //               = cbSize / (‭0100 0000 0000 0000 0000 0000‬)2
+        //               = cbSize / ((‭0001 0000 0000 0000 0000 0000‬)2 << 2)
+        //               = cbSize / (1Mb * 2^2)
+        //               = cbSize / 4Mb
+        // Only when cbSize > 4Mb can ensure cbSize >> 22 != 0.
+        // So this code just saying: 
+        // return "cbSize aligned on a Mb" && "cbSize > 4Mb";
         return (((cbSize & (1024*1024-1)) ==0) && (cbSize >> 22));
     }
 
     bool IsValidGen0MaxSize(size_t cbSize)
     {
+        // That means gen0 max size is 64Kb.
         return (cbSize >= 64*1024);
     }
 
     BOOL IsLargeObject(MethodTable *mt)
     {
+        // mt->GetBaseSize() defined on https://github.com/mazong1123/coreclrcodebook/blob/master/src/gc/env/gcenv.object.h
         return mt->GetBaseSize() >= LARGE_OBJECT_SIZE;
     }
 
