@@ -2116,6 +2116,7 @@ FCIMPL3_VII(Object*, COMNumber::FormatDouble, double value, StringObject* format
     int precision = DOUBLE_PRECISION;
     switch (val) {
     case 'R':
+        // 'R' stands for "Round-trip".
         //In order to give numbers that are both friendly to display and round-trippable,
         //we parse the number using 15 digits and then determine if it round trips to the same
         //value.  If it does, we convert that NUMBER to a string, otherwise we reparse using 17 digits
@@ -2160,6 +2161,7 @@ FCIMPL3_VII(Object*, COMNumber::FormatDouble, double value, StringObject* format
         break;
 
     case 'E':
+        // 'E' stands for "Exponential (scientific)". 
         // If digits greater than 14 then set the precision to 17. Otherwise just keep the precision in 15.
         // Here we round values less than E14 to 15 digits
         if (digits > 14) {
@@ -2168,7 +2170,11 @@ FCIMPL3_VII(Object*, COMNumber::FormatDouble, double value, StringObject* format
         break;
 
     case 'G':
-        // If digits greater than 15 then set the precision to 17. Otherwise just keep the precision in 15.
+        // 'G' stands for "General". For double, it's default precision is 15. 
+        // However, if digits greater than 15 then set the precision to 17.
+        // See msdn reference: 
+        // https://docs.microsoft.com/en-us/dotnet/standard/base-types/standard-numeric-format-strings
+        // https://docs.microsoft.com/en-us/dotnet/standard/base-types/standard-numeric-format-strings#GFormatString
         // Here we round values less than G15 to 15 digits, G16 and G17 will not be touched
         if (digits > 15) {
             precision = 17;
