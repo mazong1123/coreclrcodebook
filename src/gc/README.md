@@ -6,7 +6,7 @@ This folder contains the implementation of Garbage Collection. Before go through
 
 ## Main Process
 
-Let's start with a simpliest console app:
+Let's start with a simple console app:
 
 ```csharp
 using System;
