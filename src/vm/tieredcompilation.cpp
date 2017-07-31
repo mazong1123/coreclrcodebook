@@ -12,7 +12,6 @@
 #include "excep.h"
 #include "log.h"
 #include "win32threadpool.h"
-#include "threadsuspend.h"
 #include "tieredcompilation.h"
 
 // TieredCompilationManager determines which methods should be recompiled and
@@ -128,43 +127,6 @@ BOOL TieredCompilationManager::OnMethodCalled(MethodDesc* pMethodDesc, DWORD cur
     {
         return TRUE; // stop notifications for this method
     }
-    AsyncPromoteMethodToTier1(pMethodDesc);
-    return TRUE;
-}
-
-void TieredCompilationManager::AsyncPromoteMethodToTier1(MethodDesc* pMethodDesc)
-{
-    STANDARD_VM_CONTRACT;
-
-    NativeCodeVersion t1NativeCodeVersion;
-
-    // Add an inactive native code entry in the versioning table to track the tier1 
-    // compilation we are going to create. This entry binds the compilation to a
-    // particular version of the IL code regardless of any changes that may
-    // occur between now and when jitting completes. If the IL does change in that
-    // interval the new code entry won't be activated.
-    {
-        CodeVersionManager* pCodeVersionManager = pMethodDesc->GetCodeVersionManager();
-        CodeVersionManager::TableLockHolder lock(pCodeVersionManager);
-        ILCodeVersion ilVersion = pCodeVersionManager->GetActiveILCodeVersion(pMethodDesc);
-        NativeCodeVersionCollection nativeVersions = ilVersion.GetNativeCodeVersions(pMethodDesc);
-        for (NativeCodeVersionIterator cur = nativeVersions.Begin(), end = nativeVersions.End(); cur != end; cur++)
-        {
-            if (cur->GetOptimizationTier() == NativeCodeVersion::OptimizationTier1)
-            {
-                // we've already promoted
-                return;
-            }
-        }
-
-        if (FAILED(ilVersion.AddNativeCodeVersion(pMethodDesc, &t1NativeCodeVersion)))
-        {
-            // optimization didn't work for some reason (presumably OOM)
-            // just give up and continue on
-            return;
-        }
-        t1NativeCodeVersion.SetOptimizationTier(NativeCodeVersion::OptimizationTier1);
-    }
 
     // Insert the method into the optimization queue and trigger a thread to service
     // the queue if needed.
@@ -179,7 +141,7 @@ void TieredCompilationManager::AsyncPromoteMethodToTier1(MethodDesc* pMethodDesc
     // unserviced. Synchronous retries appear unlikely to offer any material improvement 
     // and complicating the code to narrow an already rare error case isn't desirable.
     {
-        SListElem<NativeCodeVersion>* pMethodListItem = new (nothrow) SListElem<NativeCodeVersion>(t1NativeCodeVersion);
+        SListElem<MethodDesc*>* pMethodListItem = new (nothrow) SListElem<MethodDesc*>(pMethodDesc);
         SpinLockHolder holder(&m_lock);
         if (pMethodListItem != NULL)
         {
@@ -194,7 +156,7 @@ void TieredCompilationManager::AsyncPromoteMethodToTier1(MethodDesc* pMethodDesc
         }
         else
         {
-            return;
+            return TRUE; // stop notifications for this method
         }
     }
 
@@ -219,20 +181,11 @@ void TieredCompilationManager::AsyncPromoteMethodToTier1(MethodDesc* pMethodDesc
     }
     EX_END_CATCH(RethrowTerminalExceptions);
 
-    return;
+    return TRUE; // stop notifications for this method
 }
 
 void TieredCompilationManager::OnAppDomainShutdown()
 {
-    CONTRACTL
-    {
-        NOTHROW;
-        GC_NOTRIGGER;
-        MODE_ANY;
-        CAN_TAKE_LOCK;
-    }
-    CONTRACTL_END
-
     SpinLockHolder holder(&m_lock);
     m_isAppDomainShuttingDown = TRUE;
 }
@@ -274,19 +227,17 @@ void TieredCompilationManager::OptimizeMethodsCallback()
     }
 
     ULONGLONG startTickCount = CLRGetTickCount64();
-    NativeCodeVersion nativeCodeVersion;
+    MethodDesc* pMethod = NULL;
     EX_TRY
     {
-        GCX_COOP();
         ENTER_DOMAIN_ID(m_domainId);
         {
-            GCX_PREEMP();
             while (true)
             {
                 {
                     SpinLockHolder holder(&m_lock); 
-                    nativeCodeVersion = GetNextMethodToOptimize();
-                    if (nativeCodeVersion.IsNull() ||
+                    pMethod = GetNextMethodToOptimize();
+                    if (pMethod == NULL ||
                         m_isAppDomainShuttingDown)
                     {
                         m_countOptimizationThreadsRunning--;
@@ -294,7 +245,7 @@ void TieredCompilationManager::OptimizeMethodsCallback()
                     }
                     
                 }
-                OptimizeMethod(nativeCodeVersion);
+                OptimizeMethod(pMethod);
 
                 // If we have been running for too long return the thread to the threadpool and queue another event
                 // This gives the threadpool a chance to service other requests on this thread before returning to
@@ -319,35 +270,51 @@ void TieredCompilationManager::OptimizeMethodsCallback()
     {
         STRESS_LOG2(LF_TIEREDCOMPILATION, LL_ERROR, "TieredCompilationManager::OptimizeMethodsCallback: "
             "Unhandled exception during method optimization, hr=0x%x, last method=%pM\n",
-            GET_EXCEPTION()->GetHR(), nativeCodeVersion.GetMethodDesc());
+            GET_EXCEPTION()->GetHR(), pMethod);
     }
     EX_END_CATCH(RethrowTerminalExceptions);
 }
 
 // Jit compiles and installs new optimized code for a method.
 // Called on a background thread.
-void TieredCompilationManager::OptimizeMethod(NativeCodeVersion nativeCodeVersion)
+void TieredCompilationManager::OptimizeMethod(MethodDesc* pMethod)
 {
     STANDARD_VM_CONTRACT;
 
-    _ASSERTE(nativeCodeVersion.GetMethodDesc()->IsEligibleForTieredCompilation());
-    if (CompileCodeVersion(nativeCodeVersion))
+    _ASSERTE(pMethod->IsEligibleForTieredCompilation());
+    PCODE pJittedCode = CompileMethod(pMethod);
+    if (pJittedCode != NULL)
     {
-        ActivateCodeVersion(nativeCodeVersion);
+        InstallMethodCode(pMethod, pJittedCode);
     }
 }
 
 // Compiles new optimized code for a method.
 // Called on a background thread.
-BOOL TieredCompilationManager::CompileCodeVersion(NativeCodeVersion nativeCodeVersion)
+PCODE TieredCompilationManager::CompileMethod(MethodDesc* pMethod)
 {
     STANDARD_VM_CONTRACT;
 
     PCODE pCode = NULL;
-    MethodDesc* pMethod = nativeCodeVersion.GetMethodDesc();
+    ULONG sizeOfCode = 0;
     EX_TRY
     {
-        pCode = pMethod->PrepareCode(nativeCodeVersion);
+        CORJIT_FLAGS flags = CORJIT_FLAGS(CORJIT_FLAGS::CORJIT_FLAG_MCJIT_BACKGROUND);
+        flags.Add(CORJIT_FLAGS(CORJIT_FLAGS::CORJIT_FLAG_TIER1));
+
+        if (pMethod->IsDynamicMethod())
+        {
+            ILStubResolver* pResolver = pMethod->AsDynamicMethodDesc()->GetILStubResolver();
+            flags.Add(pResolver->GetJitFlags());
+            COR_ILMETHOD_DECODER* pILheader = pResolver->GetILHeader();
+            pCode = UnsafeJitFunction(pMethod, pILheader, flags, &sizeOfCode);
+        }
+        else
+        {
+            COR_ILMETHOD_DECODER::DecoderStatus status;
+            COR_ILMETHOD_DECODER header(pMethod->GetILHeader(), pMethod->GetModule()->GetMDImport(), &status);
+            pCode = UnsafeJitFunction(pMethod, &header, flags, &sizeOfCode);
+        }
     }
     EX_CATCH
     {
@@ -357,96 +324,58 @@ BOOL TieredCompilationManager::CompileCodeVersion(NativeCodeVersion nativeCodeVe
     }
     EX_END_CATCH(RethrowTerminalExceptions)
 
-    return pCode != NULL;
+    return pCode;
 }
 
 // Updates the MethodDesc and precode so that future invocations of a method will
 // execute the native code pointed to by pCode.
 // Called on a background thread.
-void TieredCompilationManager::ActivateCodeVersion(NativeCodeVersion nativeCodeVersion)
+void TieredCompilationManager::InstallMethodCode(MethodDesc* pMethod, PCODE pCode)
 {
     STANDARD_VM_CONTRACT;
 
-    MethodDesc* pMethod = nativeCodeVersion.GetMethodDesc();
-    CodeVersionManager* pCodeVersionManager = pMethod->GetCodeVersionManager();
+    _ASSERTE(!pMethod->IsNativeCodeStableAfterInit());
 
-    // If the ilParent version is active this will activate the native code version now.
-    // Otherwise if the ilParent version becomes active again in the future the native
-    // code version will activate then.
-    ILCodeVersion ilParent;
-    HRESULT hr = S_OK;
+    PCODE pExistingCode = pMethod->GetNativeCode();
+#ifdef FEATURE_INTERPRETER
+    if (!pMethod->SetNativeCodeInterlocked(pCode, pExistingCode, TRUE))
+#else
+    if (!pMethod->SetNativeCodeInterlocked(pCode, pExistingCode))
+#endif
     {
-        // As long as we are exclusively using precode publishing for tiered compilation
-        // methods this first attempt should succeed
-        CodeVersionManager::TableLockHolder lock(pCodeVersionManager);
-        ilParent = nativeCodeVersion.GetILCodeVersion();
-        hr = ilParent.SetActiveNativeCodeVersion(nativeCodeVersion, FALSE);
+        //We aren't there yet, but when the feature is finished we shouldn't be racing against any other code mutator and there would be no
+        //reason for this to fail
+        STRESS_LOG2(LF_TIEREDCOMPILATION, LL_INFO10, "TieredCompilationManager::InstallMethodCode: Method %pM failed to update native code slot. Code=%pK\n",
+            pMethod, pCode);
     }
-    if (hr == CORPROF_E_RUNTIME_SUSPEND_REQUIRED)
+    else
     {
-        // if we start using jump-stamp publishing for tiered compilation, the first attempt
-        // without the runtime suspended will fail and then this second attempt will
-        // succeed.
-        // Even though this works performance is likely to be quite bad. Realistically
-        // we are going to need batched updates to makes tiered-compilation + jump-stamp
-        // viable. This fallback path is just here as a proof-of-concept.
-        ThreadSuspend::SuspendEE(ThreadSuspend::SUSPEND_FOR_REJIT);
+        Precode* pPrecode = pMethod->GetPrecode();
+        if (!pPrecode->SetTargetInterlocked(pCode, FALSE))
         {
-            CodeVersionManager::TableLockHolder lock(pCodeVersionManager);
-            hr = ilParent.SetActiveNativeCodeVersion(nativeCodeVersion, TRUE);
+            //We aren't there yet, but when the feature is finished we shouldn't be racing against any other code mutator and there would be no
+            //reason for this to fail
+            STRESS_LOG2(LF_TIEREDCOMPILATION, LL_INFO10, "TieredCompilationManager::InstallMethodCode: Method %pM failed to update precode. Code=%pK\n",
+                pMethod, pCode);
         }
-        ThreadSuspend::RestartEE(FALSE, TRUE);
-    }
-    if (FAILED(hr))
-    {
-        STRESS_LOG2(LF_TIEREDCOMPILATION, LL_INFO10, "TieredCompilationManager::ActivateCodeVersion: Method %pM failed to publish native code for native code version %d\n",
-            pMethod, nativeCodeVersion.GetVersionId());
     }
 }
 
 // Dequeues the next method in the optmization queue.
 // This should be called with m_lock already held and runs
 // on the background thread.
-NativeCodeVersion TieredCompilationManager::GetNextMethodToOptimize()
+MethodDesc* TieredCompilationManager::GetNextMethodToOptimize()
 {
     STANDARD_VM_CONTRACT;
 
-    SListElem<NativeCodeVersion>* pElem = m_methodsToOptimize.RemoveHead();
+    SListElem<MethodDesc*>* pElem = m_methodsToOptimize.RemoveHead();
     if (pElem != NULL)
     {
-        NativeCodeVersion nativeCodeVersion = pElem->GetValue();
+        MethodDesc* pMD = pElem->GetValue();
         delete pElem;
-        return nativeCodeVersion;
+        return pMD;
     }
-    return NativeCodeVersion();
-}
-
-//static
-CORJIT_FLAGS TieredCompilationManager::GetJitFlags(NativeCodeVersion nativeCodeVersion)
-{
-    LIMITED_METHOD_CONTRACT;
-
-    CORJIT_FLAGS flags;
-    if (!nativeCodeVersion.GetMethodDesc()->IsEligibleForTieredCompilation())
-    {
-#ifdef FEATURE_INTERPRETER
-        flags.Set(CORJIT_FLAGS::CORJIT_FLAG_MAKEFINALCODE);
-#endif
-        return flags;
-    }
-    
-    if (nativeCodeVersion.GetOptimizationTier() == NativeCodeVersion::OptimizationTier0)
-    {
-        flags.Set(CORJIT_FLAGS::CORJIT_FLAG_TIER0);
-    }
-    else
-    {
-        flags.Set(CORJIT_FLAGS::CORJIT_FLAG_TIER1);
-#ifdef FEATURE_INTERPRETER
-        flags.Set(CORJIT_FLAGS::CORJIT_FLAG_MAKEFINALCODE);
-#endif
-    }
-    return flags;
+    return NULL;
 }
 
 #endif // FEATURE_TIERED_COMPILATION

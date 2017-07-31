@@ -62,9 +62,7 @@ public:
 
 class StringLiteralMap;
 class VirtualCallStubManager;
-template <typename ELEMENT>
-class ListLockEntryBase;
-typedef ListLockEntryBase<void*> ListLockEntry;
+class ListLockEntry;
 
 class LoaderAllocator
 {

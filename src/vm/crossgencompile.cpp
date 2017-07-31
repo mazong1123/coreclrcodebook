@@ -436,3 +436,7 @@ BOOL AppDomain::BindingByManifestFile()
 {
     return FALSE;
 }
+
+ReJitManager::ReJitManager()
+{ 
+}

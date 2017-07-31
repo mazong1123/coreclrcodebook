@@ -36,7 +36,6 @@ set(VM_CROSSGEN_SOURCES
     ../generics.cpp
     ../genmeth.cpp
     ../hash.cpp
-    ../ilinstrumentation.cpp
     ../ilmarshalers.cpp
     ../ilstubcache.cpp
     ../ilstubresolver.cpp
@@ -47,6 +46,7 @@ set(VM_CROSSGEN_SOURCES
     ../contractimpl.cpp
     ../jitinterface.cpp
     ../loaderallocator.cpp
+    ../listlock.cpp
     ../memberload.cpp
     ../method.cpp
     ../methodimpl.cpp

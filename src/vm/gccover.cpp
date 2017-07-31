@@ -160,7 +160,7 @@ void SetupGcCoverage(MethodDesc* pMD, BYTE* methodStartPtr) {
     {
         BaseDomain* pDomain = pMD->GetDomain();
         // Enter the global lock which protects the list of all functions being JITd
-        JitListLock::LockHolder pJitLock(pDomain->GetJitLock());
+        ListLockHolder pJitLock(pDomain->GetJitLock());
 
 
         // It is possible that another thread stepped in before we entered the global lock for the first time.
@@ -175,14 +175,14 @@ void SetupGcCoverage(MethodDesc* pMD, BYTE* methodStartPtr) {
 #ifdef _DEBUG 
             description = pMD->m_pszDebugMethodName;
 #endif
-            ReleaseHolder<JitListLockEntry> pEntry(JitListLockEntry::Find(pJitLock, pMD->GetInitialCodeVersion(), description));
+            ListLockEntryHolder pEntry(ListLockEntry::Find(pJitLock, pMD, description));
 
             // We have an entry now, we can release the global lock
             pJitLock.Release();
 
             // Take the entry lock
             {
-                JitListLockEntry::LockHolder pEntryLock(pEntry, FALSE);
+                ListLockEntryLockHolder pEntryLock(pEntry, FALSE);
 
                 if (pEntryLock.DeadlockAwareAcquire())
                 {

@@ -13,19 +13,19 @@
 ===========================================================*/
 
 using System;
-using System.Diagnostics.Contracts;
 using System.Globalization;
+using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
 using System.Runtime.ConstrainedExecution;
-using System.Runtime.InteropServices;
-using System.Runtime.Versioning;
+using System.Diagnostics.Contracts;
 
 namespace System
 {
     [Serializable]
     [StructLayout(LayoutKind.Sequential)]
-    [TypeForwardedFrom("mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089")]
-    public struct Double :IComparable, IConvertible, IFormattable, IComparable<Double>, IEquatable<Double>
+    [System.Runtime.CompilerServices.TypeForwardedFrom("mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089")]
+    public struct Double : IComparable, IFormattable, IConvertible
+            , IComparable<Double>, IEquatable<Double>
     {
         private double m_value; // Do not rename (binary serialization)
 
@@ -42,12 +42,11 @@ namespace System
         public const double PositiveInfinity = (double)1.0 / (double)(0.0);
         public const double NaN = (double)0.0 / (double)0.0;
 
-        // We use this explicit definition to avoid the confusion between 0.0 and -0.0.
-        internal const double NegativeZero = -0.0;
+        internal static double NegativeZero = BitConverter.Int64BitsToDouble(unchecked((long)0x8000000000000000));
 
         /// <summary>Determines whether the specified value is finite (zero, subnormal, or normal).</summary>
         [Pure]
-        [NonVersionable]
+        [System.Runtime.Versioning.NonVersionable]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe static bool IsFinite(double d)
         {
@@ -57,7 +56,7 @@ namespace System
 
         /// <summary>Determines whether the specified value is infinite.</summary>
         [Pure]
-        [NonVersionable]
+        [System.Runtime.Versioning.NonVersionable]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe static bool IsInfinity(double d)
         {
@@ -67,7 +66,7 @@ namespace System
 
         /// <summary>Determines whether the specified value is NaN.</summary>
         [Pure]
-        [NonVersionable]
+        [System.Runtime.Versioning.NonVersionable]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe static bool IsNaN(double d)
         {
@@ -77,7 +76,7 @@ namespace System
 
         /// <summary>Determines whether the specified value is negative.</summary>
         [Pure]
-        [NonVersionable]
+        [System.Runtime.Versioning.NonVersionable]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe static bool IsNegative(double d)
         {
@@ -87,7 +86,7 @@ namespace System
 
         /// <summary>Determines whether the specified value is negative infinity.</summary>
         [Pure]
-        [NonVersionable]
+        [System.Runtime.Versioning.NonVersionable]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool IsNegativeInfinity(double d)
         {
@@ -96,7 +95,7 @@ namespace System
 
         /// <summary>Determines whether the specified value is normal.</summary>
         [Pure]
-        [NonVersionable]
+        [System.Runtime.Versioning.NonVersionable]
         // This is probably not worth inlining, it has branches and should be rarely called
         public unsafe static bool IsNormal(double d)
         {
@@ -107,7 +106,7 @@ namespace System
 
         /// <summary>Determines whether the specified value is positive infinity.</summary>
         [Pure]
-        [NonVersionable]
+        [System.Runtime.Versioning.NonVersionable]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool IsPositiveInfinity(double d)
         {
@@ -116,7 +115,7 @@ namespace System
 
         /// <summary>Determines whether the specified value is subnormal.</summary>
         [Pure]
-        [NonVersionable]
+        [System.Runtime.Versioning.NonVersionable]
         // This is probably not worth inlining, it has branches and should be rarely called
         public unsafe static bool IsSubnormal(double d)
         {
@@ -184,37 +183,37 @@ namespace System
             return IsNaN(temp) && IsNaN(m_value);
         }
 
-        [NonVersionable]
+        [System.Runtime.Versioning.NonVersionable]
         public static bool operator ==(Double left, Double right)
         {
             return left == right;
         }
 
-        [NonVersionable]
+        [System.Runtime.Versioning.NonVersionable]
         public static bool operator !=(Double left, Double right)
         {
             return left != right;
         }
 
-        [NonVersionable]
+        [System.Runtime.Versioning.NonVersionable]
         public static bool operator <(Double left, Double right)
         {
             return left < right;
         }
 
-        [NonVersionable]
+        [System.Runtime.Versioning.NonVersionable]
         public static bool operator >(Double left, Double right)
         {
             return left > right;
         }
 
-        [NonVersionable]
+        [System.Runtime.Versioning.NonVersionable]
         public static bool operator <=(Double left, Double right)
         {
             return left <= right;
         }
 
-        [NonVersionable]
+        [System.Runtime.Versioning.NonVersionable]
         public static bool operator >=(Double left, Double right)
         {
             return left >= right;

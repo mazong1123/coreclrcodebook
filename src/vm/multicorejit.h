@@ -103,7 +103,7 @@ public:
 
     void StoreMethodCode(MethodDesc * pMethod, PCODE pCode);
     
-    PCODE QueryMethodCode(MethodDesc * pMethod, BOOL shouldRemoveCode);
+    PCODE QueryMethodCode(MethodDesc * pMethod);
 
     inline unsigned GetRemainingMethodCount() const
     {

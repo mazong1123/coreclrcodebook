@@ -1052,17 +1052,16 @@ public:
 
     DWORD getExpectedTargetArchitecture();
 
-    CEEInfo(MethodDesc * fd = NULL, bool fVerifyOnly = false, bool fAllowInlining = true) :
+    CEEInfo(MethodDesc * fd = NULL, bool fVerifyOnly = false) :
         m_pOverride(NULL),
         m_pMethodBeingCompiled(fd),
         m_fVerifyOnly(fVerifyOnly),
         m_pThread(GetThread()),
         m_hMethodForSecurity_Key(NULL),
-        m_pMethodForSecurity_Value(NULL),
+        m_pMethodForSecurity_Value(NULL)
 #if defined(FEATURE_GDBJIT)
-        m_pCalledMethods(NULL),
+        , m_pCalledMethods(NULL)
 #endif
-        m_allowInlining(fAllowInlining)
     {
         LIMITED_METHOD_CONTRACT;
     }
@@ -1154,8 +1153,6 @@ protected:
 #if defined(FEATURE_GDBJIT)
     CalledMethod *          m_pCalledMethods;
 #endif
-
-    bool                    m_allowInlining;
 
     // Tracking of module activation dependencies. We have two flavors: 
     // - Fast one that gathers generic arguments from EE handles, but does not work inside generic context.
@@ -1333,8 +1330,8 @@ public:
 #endif
 
     CEEJitInfo(MethodDesc* fd,  COR_ILMETHOD_DECODER* header, 
-               EEJitManager* jm, bool fVerifyOnly, bool allowInlining = true)
-        : CEEInfo(fd, fVerifyOnly, allowInlining),
+               EEJitManager* jm, bool fVerifyOnly)
+        : CEEInfo(fd, fVerifyOnly),
           m_jitManager(jm),
           m_CodeHeader(NULL),
           m_ILHeader(header),
@@ -1466,6 +1463,7 @@ protected :
         bool                    m_bGphHookFunction : 1;
         void*                   m_pvGphProfilerHandle;
     } m_gphCache;
+
 
 };
 #endif // CROSSGEN_COMPILE

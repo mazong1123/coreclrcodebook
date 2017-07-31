@@ -656,20 +656,10 @@ inline MethodTable* Module::GetDynamicClassMT(DWORD dynamicClassID)
     return m_pDynamicStaticsInfo[dynamicClassID].pEnclosingMT;
 }
 
-#ifdef FEATURE_CODE_VERSIONING
-inline CodeVersionManager * Module::GetCodeVersionManager()
+inline ReJitManager * Module::GetReJitManager()
 {
     LIMITED_METHOD_CONTRACT;
-    return GetDomain()->GetCodeVersionManager();
+    return GetDomain()->GetReJitManager();
 }
-#endif // FEATURE_CODE_VERSIONING
-
-#ifdef FEATURE_TIERED_COMPILATION
-inline CallCounter * Module::GetCallCounter()
-{
-    LIMITED_METHOD_CONTRACT;
-    return GetDomain()->GetCallCounter();
-}
-#endif // FEATURE_TIERED_COMPILATION
 
 #endif  // CEELOAD_INL_

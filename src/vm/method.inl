@@ -203,21 +203,11 @@ inline BOOL HasTypeEquivalentStructParameters()
 }
 #endif // FEATURE_TYPEEQUIVALENCE
 
-#ifdef FEATURE_CODE_VERSIONING
-inline CodeVersionManager * MethodDesc::GetCodeVersionManager()
+inline ReJitManager * MethodDesc::GetReJitManager()
 {
     LIMITED_METHOD_CONTRACT;
-    return GetModule()->GetCodeVersionManager();
+    return GetModule()->GetReJitManager();
 }
-#endif
-
-#ifdef FEATURE_TIERED_COMPILATION
-inline CallCounter * MethodDesc::GetCallCounter()
-{
-    LIMITED_METHOD_CONTRACT;
-    return GetModule()->GetCallCounter();
-}
-#endif
 
 #endif  // _METHOD_INL_
 

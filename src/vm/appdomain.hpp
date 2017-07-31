@@ -49,8 +49,6 @@
 #include "callcounter.h"
 #endif
 
-#include "codeversion.h"
-
 class BaseDomain;
 class SystemDomain;
 class SharedDomain;
@@ -841,7 +839,7 @@ public:
              pEntry != NULL;
              pEntry = pEntry->m_pNext)
         {
-            if (((PEFile *)pEntry->m_data)->Equals(pFile))
+            if (((PEFile *)pEntry->m_pData)->Equals(pFile))
             {
                 return pEntry;
             }
@@ -950,9 +948,6 @@ typedef FileLoadLock::Holder FileLoadLockHolder;
 #ifndef DACCESS_COMPILE
     typedef ReleaseHolder<FileLoadLock> FileLoadLockRefHolder;
 #endif // DACCESS_COMPILE
-
-    typedef ListLockBase<NativeCodeVersion> JitListLock;
-    typedef ListLockEntryBase<NativeCodeVersion> JitListLockEntry;
 
 
 #ifdef _MSC_VER
@@ -1209,7 +1204,7 @@ public:
         return &m_ClassInitLock;
     }
 
-    JitListLock* GetJitLock()
+    ListLock* GetJitLock()
     {
         LIMITED_METHOD_CONTRACT;
         return &m_JITLock;
@@ -1403,7 +1398,7 @@ protected:
     CrstExplicitInit m_crstAssemblyList;
     BOOL             m_fDisableInterfaceCache;  // RCW COM interface cache
     ListLock         m_ClassInitLock;
-    JitListLock      m_JITLock;
+    ListLock         m_JITLock;
     ListLock         m_ILStubGenLock;
 
     // Fusion context, used for adding assemblies to the is domain. It defines
@@ -1552,21 +1547,12 @@ public:
         return m_dwSizedRefHandles;
     }
 
-#ifdef FEATURE_CODE_VERSIONING
+    // Profiler rejit
 private:
-    CodeVersionManager m_codeVersionManager;
+    ReJitManager m_reJitMgr;
 
 public:
-    CodeVersionManager* GetCodeVersionManager() { return &m_codeVersionManager; }
-#endif //FEATURE_CODE_VERSIONING
-
-#ifdef FEATURE_TIERED_COMPILATION
-private:
-    CallCounter m_callCounter;
-
-public:
-    CallCounter* GetCallCounter() { return &m_callCounter; }
-#endif
+    ReJitManager * GetReJitManager() { return &m_reJitMgr; }
 
 #ifdef DACCESS_COMPILE
 public:
@@ -3837,6 +3823,15 @@ public:
 private:
     TieredCompilationManager m_tieredCompilationManager;
 
+public:
+    CallCounter * GetCallCounter()
+    {
+        LIMITED_METHOD_CONTRACT;
+        return &m_callCounter;
+    }
+
+private:
+    CallCounter m_callCounter;
 #endif
 
 #ifdef FEATURE_COMINTEROP

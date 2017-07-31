@@ -30,6 +30,9 @@
 #include "interoputil.h"
 #include "prettyprintsig.h"
 #include "formattype.h"
+#ifdef FEATURE_INTERPRETER
+#include "interpreter.h"
+#endif
 
 #ifdef FEATURE_PREJIT
 #include "compile.h"
@@ -1172,6 +1175,16 @@ PCODE MethodDesc::GetNativeCode()
 #endif
         return pCode;
     }
+
+#ifdef FEATURE_INTERPRETER
+#ifndef DACCESS_COMPILE // TODO: Need a solution that will work under DACCESS
+    PCODE pEntryPoint = GetMethodEntryPoint();
+    if (Interpreter::InterpretationStubToMethodInfo(pEntryPoint) == this)
+    {
+        return pEntryPoint;
+    }
+#endif
+#endif
 
     if (!HasStableEntryPoint() || HasPrecode())
         return NULL;
@@ -2421,6 +2434,32 @@ BOOL MethodDesc::IsPointingToPrestub()
 
     return GetPrecode()->IsPointingToPrestub();
 }
+
+#ifdef FEATURE_INTERPRETER
+//*******************************************************************************
+BOOL MethodDesc::IsReallyPointingToPrestub()
+{
+    CONTRACTL
+    {
+        NOTHROW;
+        GC_NOTRIGGER;
+        SO_TOLERANT;
+        MODE_ANY;
+    }
+    CONTRACTL_END;
+
+    if (!HasPrecode())
+    {
+        PCODE pCode = GetMethodEntryPoint();
+        return HasTemporaryEntryPoint() && pCode == GetTemporaryEntryPoint();
+    }
+
+    if (!IsRestored())
+        return TRUE;
+
+    return GetPrecode()->IsPointingToPrestub();
+}
+#endif
 
 //*******************************************************************************
 void MethodDesc::Reset()
@@ -4141,7 +4180,7 @@ void MethodDesc::CheckRestore(ClassLoadLevel level)
             // for details on the race.
             // 
             {
-                PublishMethodHolder publishWorker(this, GetNativeCode());
+                ReJitPublishMethodHolder publishWorker(this, GetNativeCode());
                 pIMD->m_wFlags2 = pIMD->m_wFlags2 & ~InstantiatedMethodDesc::Unrestored;
             }
 
@@ -4924,7 +4963,11 @@ Precode* MethodDesc::GetOrCreatePrecode()
 }
 
 //*******************************************************************************
-BOOL MethodDesc::SetNativeCodeInterlocked(PCODE addr, PCODE pExpected /*=NULL*/)
+BOOL MethodDesc::SetNativeCodeInterlocked(PCODE addr, PCODE pExpected /*=NULL*/
+#ifdef FEATURE_INTERPRETER
+                                          , BOOL fStable
+#endif
+                                          )
 {
     CONTRACTL {
         THROWS;
@@ -4950,12 +4993,41 @@ BOOL MethodDesc::SetNativeCodeInterlocked(PCODE addr, PCODE pExpected /*=NULL*/)
         value.SetValueMaybeNull(pSlot, addr | (*dac_cast<PTR_TADDR>(pSlot) & FIXUP_LIST_MASK));
         expected.SetValueMaybeNull(pSlot, pExpected | (*dac_cast<PTR_TADDR>(pSlot) & FIXUP_LIST_MASK));
 
+#ifdef FEATURE_INTERPRETER
+        BOOL fRet = FALSE;
+
+        fRet = FastInterlockCompareExchangePointer(
+                   EnsureWritablePages(reinterpret_cast<TADDR*>(pSlot)),
+                   (TADDR&)value,
+                   (TADDR&)expected) == (TADDR&)expected;
+
+        if (!fRet)
+        {
+            // Can always replace NULL.
+            expected.SetValueMaybeNull(pSlot, (*dac_cast<PTR_TADDR>(pSlot) & FIXUP_LIST_MASK));
+            fRet = FastInterlockCompareExchangePointer(
+                       EnsureWritablePages(reinterpret_cast<TADDR*>(pSlot)),
+                       (TADDR&)value,
+                       (TADDR&)expected) == (TADDR&)expected;
+        }
+        return fRet;
+#else  // FEATURE_INTERPRETER
         return FastInterlockCompareExchangePointer(EnsureWritablePages(reinterpret_cast<TADDR*>(pSlot)),
             (TADDR&)value, (TADDR&)expected) == (TADDR&)expected;
+#endif // FEATURE_INTERPRETER
     }
 
+#ifdef FEATURE_INTERPRETER
+    PCODE pFound = FastInterlockCompareExchangePointer(GetAddrOfSlot(), addr, pExpected);
+    if (fStable)
+    {
+        InterlockedUpdateFlags2(enum_flag2_HasStableEntryPoint, TRUE);
+    }
+    return (pFound == pExpected);
+#else
     _ASSERTE(pExpected == NULL);
     return SetStableEntryPointInterlocked(addr);
+#endif
 }
 
 //*******************************************************************************
@@ -4978,6 +5050,26 @@ BOOL MethodDesc::SetStableEntryPointInterlocked(PCODE addr)
 
     return fResult;
 }
+
+#ifdef FEATURE_INTERPRETER
+BOOL MethodDesc::SetEntryPointInterlocked(PCODE addr)
+{
+    CONTRACTL {
+        NOTHROW;
+        GC_NOTRIGGER;
+    } CONTRACTL_END;
+
+    _ASSERTE(!HasPrecode());
+
+    PCODE pExpected = GetTemporaryEntryPoint();
+    PTR_PCODE pSlot = GetAddrOfSlot();
+
+    BOOL fResult = FastInterlockCompareExchangePointer(pSlot, addr, pExpected) == pExpected;
+
+    return fResult;
+}
+
+#endif // FEATURE_INTERPRETER
 
 //*******************************************************************************
 void NDirectMethodDesc::InterlockedSetNDirectFlags(WORD wFlags)
