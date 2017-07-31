@@ -137,6 +137,7 @@ unsigned int Int64DivMod1E9(unsigned __int64* value)
 #pragma warning(disable:4273)
 extern "C" char* __cdecl _ecvt(double, int, int*, int*);
 
+// Convert a double number to NUMBER struct.
 void DoubleToNumber(double value, int precision, NUMBER* number)
 {
     WRAPPER_NO_CONTRACT
@@ -144,11 +145,17 @@ void DoubleToNumber(double value, int precision, NUMBER* number)
 
     number->precision = precision;
     if (((FPDOUBLE*)&value)->exp == 0x7FF) {
+        // exp == 0x7FF => all 11 bits of exp are 1.
+        // In this case, if mantissa == 0, it represnets infinity. if mantissa != 0, it represents NaN.
+        // In either case, we don't process futher, just assign 0 to digits' first bucket.
         number->scale = (((FPDOUBLE*)&value)->mantLo || ((FPDOUBLE*)&value)->mantHi) ? SCALE_NAN: SCALE_INF;
         number->sign = ((FPDOUBLE*)&value)->sign;
         number->digits[0] = 0;
     }
     else {
+        // It is not NaN or infinity. Call _ecvt to convert to string.
+        // Note, _ecvt called snprintf so that the performance is not good on Linux.
+        // Here is an on-going PR trying to fix it: https://github.com/dotnet/coreclr/pull/12894
         char* src = _ecvt(value, precision, &number->scale, &number->sign);
         wchar* dst = number->digits;
         if (*src != '0') {
@@ -1280,6 +1287,8 @@ wchar* FormatPercent(__in_ecount(cchBuffer) wchar* buffer, SIZE_T cchBuffer, NUM
     return buffer;
 }
 
+// Convert a number struct to string.
+// typedef DWORD StringRef;
 STRINGREF NumberToString(NUMBER* number, wchar format, int nMaxDigits, NUMFMTREF numfmt, BOOL bDecimal = FALSE )
 {
     CONTRACTL {
@@ -1350,6 +1359,7 @@ STRINGREF NumberToString(NUMBER* number, wchar format, int nMaxDigits, NUMFMTREF
     switch (ftype) {
     case 'C':
         {
+            // Currency.
         nMinDigits = nMaxDigits >= 0 ? nMaxDigits : numfmt->cCurrencyDecimals;
 
         if (nMaxDigits< 0) 
