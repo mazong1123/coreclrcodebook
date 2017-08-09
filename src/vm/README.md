@@ -20,13 +20,13 @@ https://github.com/dotnet/coreclr/blob/master/Documentation/botr/type-loader.md
 
 https://github.com/dotnet/coreclr/blob/master/Documentation/botr/method-descriptor.md
 
-### How to iterate fields of an object
+### How to iterate fields of an `Object`
 
-Given an instance of Object type, to iterate its fields we need to do following as prerequisites:
+Given an instance of Object type, to iterate its fields we need to do following:
 
 - Get the method table of the object. This can be done via `object->GetMethodTable()`.
 
-- Construct a `ApproxFieldDescIterator`: 
+- Construct an `ApproxFieldDescIterator`: 
     ```cpp
     ApproxFieldDescIterator(methodTable, ApproxFieldDescIterator::INSTANCE_FIELDS);
     ```
@@ -68,3 +68,19 @@ Given an instance of Object type, to iterate its fields we need to do following 
         pField = iter.Next();
     }
     ```
+
+### How to get the method table of a `FieldDesc`.
+
+Given a pointer to an instance of `FieldDesc`, we can do following to get its method table:
+
+```cpp
+MethodTable* fieldMethodTable = pField->LookupFieldTypeHandle().GetMethodTable();
+```
+
+### How to get the method table of an `EEClass`.
+
+To get a method table of an instance of `EEClass` can be simply done via `GetMethodTable()`:
+
+```cpp
+PTR_MethodTable mt = cls->GetMethodTable();
+```
